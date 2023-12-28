@@ -10,7 +10,7 @@
 #include "core/common/logging/logging.h"
 #include "core/graph/graph_viewer.h"
 #include "iree/compiler/embedding_api.h"
-#include "iree/compiler/MLIRInterop.h"
+#include "iree/compiler/mlir_interop.h"
 
 #include <string>
 #include <string_view>

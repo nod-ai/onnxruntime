@@ -46,28 +46,40 @@ set_source_files_properties(
       "-Wno-unused-parameter -Wno-shorten-64-to-32"
 )
 
+# TODO: Dev package support in IREE is new so we are being a bit pedantic about config.
+# This could be relaxes significantly.
 set(ONNXRUNTIME_IREE_HOME "" CACHE STRING "Path to the IREE development package")
 if(NOT ONNXRUNTIME_IREE_HOME)
   message(SEND_ERROR "Expected -DONNXRUNTIME_IREE_HOME to be set to the development package directory (see README)")
 endif()
+set(IREECompiler_DIR "${ONNXRUNTIME_IREE_HOME}/lib/cmake/IREE")
+set(IREERuntime_DIR "${ONNXRUNTIME_IREE_HOME}/lib/cmake/IREE")
+
+if(NOT EXISTS "${IREECompiler_DIR}/IREECompilerConfig.cmake")
+  message(WARNING "Did not find IREECompilerConfig.cmake under ${IREECompiler_DIR}. Check -DONNXRUNTIME_IREE_HOME.")
+endif()
+if(NOT EXISTS "${IREERuntime_DIR}/IREERuntimeConfig.cmake")
+  message(WARNING "Did not find IREERuntimeConfig.cmake under ${IREECompiler_DIR}. Check -DONNXRUNTIME_IREE_HOME.")
+endif()
+
+find_package(IREECompiler REQUIRED)
+find_package(IREERuntime REQUIRED)
 
 # Compiler deps. See README.md for temporary steps on how to make a dev package.
 # TODO: Depend on real dev packages for iree-compiler and iree-runtime.
 # TODO: Also figure out why the shared library libIREECompiler.so dep needs to be public.
 # TODO: Once the dev package CMake integration is set up, depend via normal CMake libraries.
 # TODO: Copy the IREECompiler runtime library to the appropriate place as part of installation.
-target_include_directories(
-  onnxruntime_providers_iree PRIVATE
-  ${ONNXRUNTIME_IREE_HOME}/include
-)
-target_link_directories(onnxruntime_providers_iree PUBLIC
-  ${ONNXRUNTIME_IREE_HOME}/lib
-)
+# target_include_directories(
+#   onnxruntime_providers_iree PRIVATE
+#   ${ONNXRUNTIME_IREE_HOME}/include
+# )
+# target_link_directories(onnxruntime_providers_iree PUBLIC
+#   ${ONNXRUNTIME_IREE_HOME}/lib
+# )
 target_link_libraries(onnxruntime_providers_iree PUBLIC
-  IREECompiler
+  iree_compiler_API_SharedImpl
   iree_runtime_unified
-  flatcc_runtime
-  flatcc_parsing
 )
 
 set_target_properties(onnxruntime_providers_iree PROPERTIES FOLDER "ONNXRuntime")

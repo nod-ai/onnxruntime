@@ -29,38 +29,16 @@ With the above, this EP should be built out to relative completion and be suitab
 
 ### IREE Dev Tree
 
-This is the first time outside of a monorepo that we have used all of the IREE compiler, MLIR C API and IREE runtime
-API together as part of a large external project. In order to do it, we have crafted an IREE "dev package" that is
-currently manually assembled but should be automated. This lets us take a static/source dep on the runtime and
-a shared library dep on the compiler (built separately) and avoid the common woes that come from building a large,
-LLVM based combination.
+We are using IREE as a CMake dep, introduced upstream in https://github.com/openxla/iree/pull/16008. This is
+having some kinks worked out but should work. Currently, there is a conflict on `cpuinfo`, so IREE must be built
+with `-DIREE_ENABLE_CPUINFO=OFF`.
 
-This is currently done manually with the following commands (given an IREE source and build tree):
+The IREE dep is currently configured via the `-DONNXRUNTIME_IREE_HOME=` CMake variable. It must be set to
+the path of a locally built IREE build directory or an install directory (i.e. by fetching built packages from the
+releases page). Dev is currently taking place mostly against local build dirs.
 
-```
-# Change paths here to correspond to your setup.
-IREE_SRC_DIR=/home/stella/src/iree
-IREE_BUILD_DIR=/home/stella/src/iree-build
-DEV_PKG_DIR=/home/stella/src/onnxruntime-iree-bits
-mkdir -p $DEV_PKG_DIR/include $DEV_PKG_DIR/lib
-# Compiler lib and headers.
-ln -s $IREE_BUILD_DIR/lib/libIREECompiler.so lib/
-cp -R $IREE_SRC_DIR/compiler/bindings/c/iree $DEV_PKG_DIR/include
-# TODO: MLIRInterop.h is in the private source tree. Make it public upstream to match here.
-cp $IREE_SRC_DIR/compiler/src/iree/compiler/API/MLIRInterop.h $DEV_PKG_DIR/include/iree/compiler
-cp -R $IREE_SRC_DIR/third_party/llvm-project/mlir/include/mlir-c $DEV_PKG_DIR/include
-# Runtime lib and headers.
-ln -s $IREE_BUILD_DIR/runtime/src/iree/runtime/libiree_runtime_unified.a $DEV_PKG_DIR/lib
-ln -s $IREE_BUILD_DIR/build_tools/third_party/flatcc/libflatcc_runtime.a $DEV_PKG_DIR/lib
-ln -s $IREE_BUILD_DIR/build_tools/third_party/flatcc/libflatcc_parsing.a $DEV_PKG_DIR/lib
-for i in $(cd $IREE_SRC_DIR/runtime/src && find . -name '*.h'); do mkdir -p $DEV_PKG_DIR/include/$(dirname $i)/; cp $IREE_SRC_DIR/runtime/src/$i $DEV_PKG_DIR/include/$(dirname $i)/; done
-```
-
-NOTE: To use the above, IREE must have been built with `-DIREE_ENABLE_THIN_ARCHIVES=OFF` or else the
-archives cannot just be copied around like this (the getting started guide recommends to have it on to aid
-development). If you get it wrong, you'll get strange linker failures complaining about missing object files.
-
-This is ripe for some upstream packaging work but gets us going for now.
+Under the covers, this is just setting `IREECompiler_DIR` + `IREERuntime_DIR` and then doing a
+`find_package(IREECompiler)` + `find_package(IREERuntime)`. See `onnxruntime_providers_iree.cmake`.
 
 ## Dev Builds
 
@@ -69,7 +47,7 @@ The following produces a reasonable development setup on Linux:
 ```
 CC=clang CXX=clang++ LDFLAGS="-fuse-ld=lld" \
 ./build.sh --config=RelWithDebInfo --cmake_generator=Ninja \
-    --use_iree --cmake_extra_defines "ONNXRUNTIME_IREE_HOME=/home/stella/src/onnxruntime-iree-bits" \
+    --use_iree --cmake_extra_defines "ONNXRUNTIME_IREE_HOME=/path/to/iree/build/or/install/tree" \
     --use_cache --use_full_protobuf \
     --enable_symbolic_shape_infer_tests \
     --update --build
