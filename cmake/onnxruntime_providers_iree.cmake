@@ -28,23 +28,24 @@ target_link_libraries(onnxruntime_providers_iree PRIVATE
   onnx
   protobuf::libprotobuf
 )
+if ( CMAKE_COMPILER_IS_GNUCC )
+  target_compile_options(
+    onnxruntime_providers_iree PRIVATE
+    # IREE's runtime headers are written in the C style and need some tweaks.
+    -Wno-missing-field-initializers
+    # We're not going to fix this.
+    -Wno-unused-function
+  )
 
-target_compile_options(
-  onnxruntime_providers_iree PRIVATE
-  # IREE's runtime headers are written in the C style and need some tweaks.
-  -Wno-missing-field-initializers
-  # We're not going to fix this.
-  -Wno-unused-function
-)
-
-# Torch-mlir warnings disable warnings on external sources.
-# TODO: Fix these at the source.
-set_source_files_properties(
-  ${onnxruntime_providers_iree_jit_compiler_srcs}
-  PROPERTIES
-    COMPILE_FLAGS
-      "-Wno-unused-parameter -Wno-shorten-64-to-32"
-)
+  # Torch-mlir warnings disable warnings on external sources.
+  # TODO: Fix these at the source.
+  set_source_files_properties(
+    ${onnxruntime_providers_iree_jit_compiler_srcs}
+    PROPERTIES
+      COMPILE_FLAGS
+        "-Wno-unused-parameter -Wno-shorten-64-to-32"
+  )
+endif()
 
 # Note that these will fail if IREECompilerConfig.cmake and IREERuntime.cmake are not on the search path.
 # There are multiple ways to ensure this, but typically (as will be called out in the error message):

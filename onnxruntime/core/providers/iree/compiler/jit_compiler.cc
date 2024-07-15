@@ -109,7 +109,7 @@ CompilerInvocation::CompilerInvocation(CompilerSession& session, const char* mod
         CompilerInvocation* self = static_cast<CompilerInvocation*>(userData);
         self->diagnostics.emplace_back(DiagnosticRecord{severity, std::string(message, messageSize)});
         // VLOG it.
-        VLOGS(session.logger, INFO) << self->diagnostics.back().ToString();
+        VLOGS(self->session.logger, INFO) << self->diagnostics.back().ToString();
       },
       static_cast<void*>(this));
 
@@ -120,7 +120,7 @@ CompilerInvocation::CompilerInvocation(CompilerSession& session, const char* mod
         auto* self = static_cast<CompilerInvocation*>(userdata);
         // TODO: We need to have better configuration for how to dump such reproducers.
         auto output_path = std::filesystem::temp_directory_path() / "ort_iree_reproducer.mlir";
-        std::string output_path_str = output_path;
+        std::string output_path_str = output_path.string();
         LOGS(self->session.logger, ERROR) << "IREE compiler crash. Writing reproducer to: " << output_path_str;
         return ireeCompilerOutputOpenFile(output_path_str.c_str(), out_output);
       },
