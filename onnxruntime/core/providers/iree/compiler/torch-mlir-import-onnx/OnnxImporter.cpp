@@ -387,6 +387,14 @@ ContextCache::ConvertTensorProtoToAttr(const onnx::TensorProto &tp) {
     case onnx::TensorProto::DataType::TensorProto_DataType_FLOAT:
       return mlirDenseElementsAttrFloatGet(tensor_type, tp.float_data_size(),
                                            tp.float_data().data());
+    case onnx::TensorProto::DataType::TensorProto_DataType_INT8: {
+      std::vector<int8_t> int8_conversion;
+      int8_conversion.reserve(tp.int32_data_size());
+      for (int32_t v : tp.int32_data())
+        int8_conversion.push_back(v);
+      return mlirDenseElementsAttrInt8Get(
+          tensor_type, int8_conversion.size(), int8_conversion.data());
+    }
     case onnx::TensorProto::DataType::TensorProto_DataType_INT32:
       return mlirDenseElementsAttrInt32Get(tensor_type, tp.int32_data_size(),
                                            tp.int32_data().data());
