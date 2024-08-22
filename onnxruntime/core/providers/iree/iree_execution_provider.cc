@@ -102,7 +102,15 @@ common::Status IREEExecutionProvider::Compile(const std::vector<FusedNodeAndGrap
   // TODO: The target needs to be synchronized with the runtime based on EP options.
   // TODO: We should just be adding the target to the module instead of specifying via
   // flags.
-  ORT_RETURN_IF_ERROR(compiler.SetFlag("--iree-hal-target-backends=llvm-cpu"));
+  std::string device_flag = "--iree-hal-target-backends=";
+  if (info_.find("hal_target_device") == info_.end()) {
+    // In case device info is absent, set `llvm-cpu` as default hal-target-backend.
+    device_flag.append("llvm-cpu");
+  } else {
+    device_flag.append(info_["hal_target_device"]);
+  }
+  LOGS(*GetLogger(), INFO) << "IREEExecutionProvider compile: setting device flag as " << device_flag;
+  ORT_RETURN_IF_ERROR(compiler.SetFlag(device_flag.c_str()));
   ORT_RETURN_IF_ERROR(compiler.Initialize());
   std::string module_name = "ort";
   iree_ep_jit::CompilerInvocation inv(compiler, module_name.c_str());
