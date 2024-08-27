@@ -58,6 +58,51 @@ Explanations:
 Once the build has been initially done, you can work in the `build/Linux/RelWithDebInfo` directory if that is more
 comfortable.
 
+## Building on Windows
+
+Instructions for setting up IREE-EP on windows is similar to linux.
+
+1. Make sure you have the appropriate C++ development environment setup. E.g. install Visual Studio Build Tools 2022 and start "x64 Native Tools Command Prompt for Visual Studio 2022" as administrator to get access to a compiler and linker. It is useful to check that you have registry edit permissions (try running regedit), since successful initialization of this environment requires such access. If you don't already have cmake and ninja, install them with winget (or your preferred method). Once you have the development environment setup, it is helpful to run
+```powershell
+powershell
+Set-ExecutionPolicy Bypass -Scope Process
+cd <your development directory>
+```
+
+2. Build IREE from source. After cloning the repository and updating submodules, you can use a build command like the following to get an IREE build that will work with IREE-EP for llvm-cpu:
+```powershell
+cmake -S . -B build -G "Ninja" -DCMAKE_BUILD_TYPE=Release `
+   -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DIREE_ENABLE_ASSERTIONS=ON `
+   -DLLVM_ENABLE_ASSERTIONS=ON -UIREE_DEFAULT_CPU_LLVM_TARGETS `
+   -DIREE_BUILD_SAMPLES=OFF -DIREE_BUILD_PYTHON_BINDINGS=OFF `
+   -DIREE_BUILD_BINDINGS_TFLITE=OFF -DIREE_HAL_DRIVER_DEFAULTS=OFF `
+   -DIREE_HAL_DRIVER_LOCAL_SYNC=ON -DIREE_HAL_DRIVER_LOCAL_TASK=ON `
+   -DIREE_TARGET_BACKEND_DEFAULTS=OFF -DIREE_TARGET_BACKEND_LLVM_CPU=ON `
+   -DIREE_INPUT_TOSA=OFF -DIREE_INPUT_STABLEHLO=OFF -DIREE_ENABLE_CPUINFO=OFF
+```
+Importantly, `-DIREE_ENABLE_CPUINFO=OFF` is required to work properly with IREE-EP.
+
+3. Add iree-compile and iree-run-module to PATH:
+```powershell
+$env:path += ";<abs path to IREE build dir>\tools"
+```
+This is an important step, otherwise onnxruntime executable files won't be able to find `ireeCompiler.dll` and will just silently fail.
+
+4. Clone this repo and run the following build command from your onnxruntime directory:
+```powershell
+.\build.bat --config=RelWithDebInfo --cmake_generator=Ninja `
+     --build_shared_lib `
+     --compile_no_warning_as_error `
+     --parallel `
+     --use_iree `
+     --cmake_extra_defines "IREECompiler_DIR=C:/z/iree/build/lib/cmake/IREE" `
+     --cmake_extra_defines "IREERuntime_DIR=C:/z/iree/build/lib/cmake/IREE" `
+     --use_full_protobuf `
+     --enable_symbolic_shape_infer_tests `
+     --update `
+     --build
+```
+
 ## Build from released IREE
 
 IMPORTANT: This will currently not work with stock IREE builds because of the cpuinfo issue listed above.
@@ -82,6 +127,7 @@ packaging==23.2
 protobuf==4.25.1
 sympy==1.12
 ```
+Note: the following commands also work with windows powershell, but you'll need to change the forward to back slashes in file paths, and use backtick instead of backslash to seperate a command into multiple lines.
 
 ```
 # From build dir.
