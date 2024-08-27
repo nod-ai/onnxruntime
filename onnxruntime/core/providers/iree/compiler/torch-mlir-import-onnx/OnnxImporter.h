@@ -17,6 +17,7 @@
 // for class members/accessors because canonical protobuf coding presumes
 // this kind of style.
 
+#include "core/graph/graph_viewer.h"
 #include "mlir-c/IR.h"
 #include "onnx/onnx_pb.h"
 
@@ -182,6 +183,7 @@ public:
   /// the null type.
   MlirType GetVtensorType(const std::vector<int64_t> &dims,
                           MlirType element_type);
+  MlirType GetNoneType();
 
 private:
   ModelInfo &model_info_;
@@ -206,10 +208,13 @@ public:
                         MlirOperation *out_function_op = nullptr);
 
   /// Imports all nodes topologically. Internally calls FinalizeGraph.
-  Status ImportAll();
+  Status ImportAll(const onnxruntime::GraphViewer &gv);
+
+  /// Imports !torch.none constant values that replace inputs that do not have names.
+  void ImportNoneConstant();
 
   /// Import nodes one at a time. Must complete with a call to FinalizeGraph.
-  Status ImportNode(const onnx::NodeProto &node);
+  Status ImportNode(const onnx::NodeProto &node, const onnxruntime::GraphViewer &gv);
   Status FinalizeGraph();
 
   void DebugDumpModule();
@@ -220,7 +225,7 @@ private:
   MlirAttribute ImportGeneralAttribute(const onnx::AttributeProto &onnx_attr);
 
   // Special-form nodes.
-  Status ImportGeneralNode(const onnx::NodeProto &node);
+  Status ImportGeneralNode(const onnx::NodeProto &node, const onnxruntime::GraphViewer &gv);
   Status ImportConstantOfShapeNode(const onnx::NodeProto &node);
 
   /// Looks for an initializer for `name` and attempts to treat it as a 1D

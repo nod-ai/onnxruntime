@@ -9,6 +9,7 @@
 
 #include "OnnxImporter.h"
 
+#include "core/graph/graph_viewer.h"
 #include "mlir-c/BuiltinAttributes.h"
 #include "mlir-c/BuiltinTypes.h"
 
@@ -227,6 +228,7 @@ Status GraphInfo::Initialize() {
   return success();
 }
 
+#if 0
 const onnx::TypeProto *GraphInfo::FindTypeProtoForName(std::string_view name) {
   // Node outputs don't typically have type information, but shape inference
   // will associate them in the value_info. If not there, it may be a
@@ -250,12 +252,20 @@ const onnx::TypeProto *GraphInfo::FindTypeProtoForName(std::string_view name) {
   model_info_.SetError(std::move(msg));
   return nullptr;
 }
+#endif
 
 // ---------------------------------------------------------------------------//
 // ContextCache
 // ---------------------------------------------------------------------------//
 
+MlirType ContextCache::GetNoneType() {
+  return mlirTypeParseGet(context_, toMlirStringRef("!torch.none"));
+}
+
 MlirType ContextCache::ConvertTypeProto(const onnx::TypeProto &tp) {
+  if(tp.value_case() == onnx::TypeProto::VALUE_NOT_SET)
+    return GetNoneType();
+
   if (tp.has_tensor_type()) {
     // Convert Tensor TypeProto.
     const onnx::TypeProto_Tensor &tt = tp.tensor_type();
@@ -511,6 +521,22 @@ NodeImporter::NodeImporter(GraphInfo &graph_info, ContextCache &cc,
                                      /*childLoc=*/{nullptr});
 }
 
+void NodeImporter::ImportNoneConstant() {
+  auto found_it = nv_map_.find("");
+  if (found_it != nv_map_.end())
+    return;
+
+  // Create an empty node(i.e. a none val), and place it in nv_map_.
+  // This function should be called _just once_, to avoid multiple
+  // nodes producing the same none value. Once set, there is really
+  // no need to put "" in nv_map again.
+  MlirOperation op = createMlirOperationAtEnd(
+      body_block_, "torch.constant.none", default_loc_, cc_.GetNoneType());
+  MlirValue nne = mlirOperationGetResult(op, 0);
+  // Place into nv_map.
+  nv_map_[""] = nne;
+}
+
 Status NodeImporter::DefineFunction(std::optional<std::string> name,
                                     MlirOperation *out_function_op) {
   const onnx::GraphProto &p = graph_info_.graph_proto();
@@ -621,7 +647,7 @@ void NodeImporter::PopulateGraphAttrs(MlirOperation container_op) {
       mlirStringAttrGet(context_, toMlirStringRef(m.producer_version())));
 }
 
-Status NodeImporter::ImportAll() {
+Status NodeImporter::ImportAll(const onnxruntime::GraphViewer &gv) {
   // TODO: Consider pulling in initializers on demand since there can be so
   // much unused crap.
   for (auto it : graph_info_.initializer_map()) {
@@ -629,7 +655,7 @@ Status NodeImporter::ImportAll() {
       return failure();
   }
   for (auto it : graph_info_.graph_proto().node()) {
-    if (failed(ImportNode(it)))
+    if (failed(ImportNode(it, gv)))
       return failure();
   }
 
@@ -686,17 +712,19 @@ Status NodeImporter::ImportInitializer(const onnx::TensorProto &initializer) {
   return success();
 }
 
-Status NodeImporter::ImportNode(const onnx::NodeProto &node) {
+Status NodeImporter::ImportNode(const onnx::NodeProto &node,
+                                const onnxruntime::GraphViewer &gv) {
   std::string_view op_type = node.op_type();
   // Handle special-form op types that do not go down the generic path.
   if (op_type == "ConstantOfShape") {
     return ImportConstantOfShapeNode(node);
   }
 
-  return ImportGeneralNode(node);
+  return ImportGeneralNode(node, gv);
 }
 
-Status NodeImporter::ImportGeneralNode(const onnx::NodeProto &node) {
+Status NodeImporter::ImportGeneralNode(const onnx::NodeProto &node,
+                                       const onnxruntime::GraphViewer &gv) {
   MlirLocation loc =
       node.name().empty()
           ? mlirLocationUnknownGet(context_)
@@ -720,7 +748,7 @@ Status NodeImporter::ImportGeneralNode(const onnx::NodeProto &node) {
   std::vector<MlirType> output_types;
   for (auto &output_name : node.output()) {
     const onnx::TypeProto *type_proto =
-        graph_info_.FindTypeProtoForName(output_name);
+        gv.GetNodeArg(output_name)->TypeAsProto();
     if (!type_proto)
       return failure();
 
