@@ -7,6 +7,10 @@
 #include "core/session/onnxruntime_c_api.h"
 #include "iree/runtime/api.h"
 
+#include <filesystem>
+
+namespace fs = std::filesystem;
+
 namespace onnxruntime::iree_ep_rt {
 
 // Handles a failing IREE status.
@@ -27,7 +31,7 @@ struct Instance {
 
   // Initializes the instance.
   // TODO: We should probably pass the options in here and use it to set up.
-  iree_status_t Initialize();
+  iree_status_t Initialize(std::string device_str);
 
   // Instance globals.
   iree_runtime_instance_options_t options;
@@ -48,7 +52,7 @@ struct Session {
   // Append a user-compiled bytecode module buffer to the session, along with a dispose callback.
   // The dispose callback will be invoked when Session is destroyed regardless of success/failure
   // of this call.
-  iree_status_t AppendBytecodeModule(void* contents, uint64_t size, std::function<void()> dispose_callback);
+  iree_status_t AppendBytecodeModule(fs::path vmfb_path, std::function<void()> dispose_callback);
 
   // Calls the entrypoint. This returns an ORT Status and normalizes any IREE statuses to that
   // because that can arise from ORT interactions.

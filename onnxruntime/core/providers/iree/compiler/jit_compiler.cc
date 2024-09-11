@@ -10,7 +10,6 @@
 #include "mlir-c/BuiltinAttributes.h"
 
 #include <cstring>
-#include <filesystem>
 
 namespace onnxruntime::iree_ep_jit {
 
@@ -208,11 +207,14 @@ common::Status CompilerInvocation::ImportSubgraph(const onnxruntime::GraphViewer
   return common::Status::OK();
 }
 
-common::Status CompilerInvocation::CompileAndOutputVMFB(iree_compiler_output_t* output) {
+common::Status CompilerInvocation::CompileAndOutputVMFB(iree_compiler_output_t* output, fs::path vmfb_path) {
   // Main compilation.
   if (!ireeCompilerInvocationPipeline(inv, IREE_COMPILER_PIPELINE_STD)) {
     return ORT_MAKE_STATUS(ONNXRUNTIME, INVALID_GRAPH, "IREE compilation error.", ConsumeDiagnostics());
   }
+
+  // Attach the compiled output to a file.
+  ireeCompilerOutputOpenFile(vmfb_path.c_str(), &output);
 
   // Output.
   if (auto* err = ireeCompilerInvocationOutputVMBytecode(inv, output)) {

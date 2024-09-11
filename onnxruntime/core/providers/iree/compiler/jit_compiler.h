@@ -12,8 +12,11 @@
 #include "iree/compiler/embedding_api.h"
 #include "iree/compiler/mlir_interop.h"
 
+#include <filesystem>
 #include <string>
 #include <string_view>
+
+namespace fs = std::filesystem;
 
 namespace onnxruntime::iree_ep_jit {
 
@@ -44,13 +47,14 @@ struct CompilerOutput {
 
   // Releases ownership of the output, returning a callback that can be used to
   // destroy it at a later date.
-  std::function<void()> Release() {
-    iree_compiler_output_t* local_output = output;
+  std::function<void()> Release(fs::path vmfb_path) {
+    iree_compiler_output_t* local_output = this->output;
     this->output = nullptr;
-    return [local_output]() {
+    return [local_output, vmfb_path]() {
       if (local_output) {
         ireeCompilerOutputDestroy(local_output);
       }
+      fs::remove(vmfb_path);
     };
   }
 
@@ -84,7 +88,7 @@ struct CompilerInvocation {
   common::Status ImportSubgraph(const onnxruntime::GraphViewer& graph_view, const std::string& func_name);
 
   // Compile and output a VMFB.
-  common::Status CompileAndOutputVMFB(iree_compiler_output_t* output);
+  common::Status CompileAndOutputVMFB(iree_compiler_output_t* output, fs::path vmfb_path);
 
   // If there are any diagnostics, clears them and returns a loggable string.
   std::string ConsumeDiagnostics();

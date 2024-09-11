@@ -13,18 +13,7 @@ common::Status HandleFailingIREEStatus(iree_status_t iree_status) {
     return common::Status::OK();
   }
 
-  std::string buffer;
-  iree_host_size_t actual_len;
-  buffer.resize(1024);
-  if (!iree_status_format(iree_status, buffer.size(), buffer.data(),
-                          &actual_len)) {
-    buffer.resize(actual_len);
-    if (!iree_status_format(iree_status, buffer.size(), buffer.data(),
-                            &actual_len)) {
-      actual_len = 0;
-    }
-  }
-  buffer.resize(actual_len);
+  std::string buffer = iree::Status::ToString(iree_status);
 
   return ORT_MAKE_STATUS(ONNXRUNTIME, RUNTIME_EXCEPTION, "IREE Runtime Error: ", std::move(buffer));
 }
@@ -43,13 +32,13 @@ Instance::~Instance() {
   }
 }
 
-iree_status_t Instance::Initialize() {
+iree_status_t Instance::Initialize(std::string device_str) {
   IREE_RETURN_IF_ERROR(iree_runtime_instance_create(
       &options, iree_allocator_system(), &instance));
 
   // TODO: Need real device selection.
   IREE_RETURN_IF_ERROR(iree_runtime_instance_try_create_default_device(
-      instance, iree_make_cstring_view("local-task"), &device));
+      instance, iree_make_cstring_view(device_str.c_str()), &device));
 
   return iree_ok_status();
 }
@@ -74,11 +63,14 @@ iree_status_t Session::Initialize() {
       &session);
 }
 
-iree_status_t Session::AppendBytecodeModule(void* contents, uint64_t size, std::function<void()> dispose_callback) {
+iree_status_t Session::AppendBytecodeModule(fs::path vmfb_path, std::function<void()> dispose_callback) {
   dispose_callbacks.push_back(std::move(dispose_callback));
-  return iree_runtime_session_append_bytecode_module_from_memory(
-      session, iree_make_const_byte_span(contents, size),
-      iree_allocator_null());
+  // TODO(Shukla-Gaurav): load from memory instead of file.
+  // return iree_runtime_session_append_bytecode_module_from_memory(
+  //     session, iree_make_const_byte_span(contents, size),
+  //     iree_allocator_null());
+  return iree_runtime_session_append_bytecode_module_from_file(
+      session, vmfb_path.c_str());
 }
 
 namespace {
@@ -245,6 +237,16 @@ common::Status Session::Call(const char* entrypoint_name, const OrtApi* ort_api,
     iree_hal_buffer_t* ret_buffer = iree_hal_buffer_view_buffer(ret.bv);
     // TODO: Synchronous mapping read, like everything in this function, is not a
     // great idea. It isn't supported on all device types and will need a scrub.
+    iree_string_view_t device_val = iree_hal_device_id(device);
+    auto device_str = std::string(device_val.data, device_val.size);
+    if (device_str == "hip") {
+      ORT_RETURN_IF_ERROR(HandleIREEStatus(iree_hal_device_transfer_d2h(
+          iree_runtime_session_device(session),
+          ret_buffer, 0, output_tensor.GetTensorMutableRawData(),
+          iree_hal_buffer_view_byte_length(ret.bv), IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
+          iree_infinite_timeout())));
+      return common::Status::OK();
+    }
     ORT_RETURN_IF_ERROR(HandleIREEStatus(iree_hal_buffer_map_read(ret_buffer, /*source_offset=*/0,
                                                                   output_tensor.GetTensorMutableRawData(),
                                                                   iree_hal_buffer_view_byte_length(ret.bv))));
