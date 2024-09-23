@@ -93,10 +93,6 @@ public:
     return nullptr;
   }
 
-  std::unordered_map<std::string_view, const onnx::ValueInfoProto &> &
-  value_info_map() {
-    return value_info_map_;
-  }
   std::vector<const onnx::ValueInfoProto *> &inputs() { return inputs_; }
   std::unordered_map<std::string_view, const onnx::ValueInfoProto &> &
   input_map() {
