@@ -399,6 +399,12 @@ select from 'TF8', 'TF16', 'UINT8', 'FLOAT', 'ITENSOR'. \n)");
 #else
     ORT_THROW("NNAPI is not supported in this build\n");
 #endif
+  } else if (provider_name_ == onnxruntime::kIreeExecutionProvider) {
+#ifdef USE_IREE
+    session_options.AppendExecutionProvider("IREE");
+#else
+    ORT_THROW("IREE is not supported in this build\n");
+#endif
   } else if (provider_name_ == onnxruntime::kVSINPUExecutionProvider) {
 #ifdef USE_VSINPU
     Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_VSINPU(session_options));
