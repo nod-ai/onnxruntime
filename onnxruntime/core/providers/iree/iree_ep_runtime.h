@@ -5,7 +5,10 @@
 
 #include "core/common/common.h"
 #include "core/session/onnxruntime_c_api.h"
+#include "iree/modules/hal/types.h"
 #include "iree/runtime/api.h"
+
+#include "module.h"
 
 #include <filesystem>
 
