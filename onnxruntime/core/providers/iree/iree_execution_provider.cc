@@ -118,6 +118,8 @@ common::Status IREEExecutionProvider::Compile(const std::vector<FusedNodeAndGrap
     LOGS(*GetLogger(), INFO) << "IREEExecutionProvider compile: setting flag " << extra_flag;
     ORT_RETURN_IF_ERROR(compiler.SetFlag(extra_flag.c_str()));
   }
+  std::string extra_flag_2 = "--iree-execution-model=async-external";
+  ORT_RETURN_IF_ERROR(compiler.SetFlag(extra_flag_2.c_str()));
 
   ORT_RETURN_IF_ERROR(compiler.Initialize());
   std::string module_name = "ort";
