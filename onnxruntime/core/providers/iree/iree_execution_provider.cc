@@ -168,6 +168,11 @@ common::Status IREEExecutionProvider::Compile(const std::vector<FusedNodeAndGrap
   // In case device info is absent, set `local-task` as default device.
   ORT_RETURN_IF_ERROR(iree_ep_rt::HandleIREEStatus(rt_session->Initialize()));
 
+  // Release hal device after session initialization.
+  if (rt_instance_->device) {
+    iree_hal_device_release(rt_instance_->device);
+  }
+
   // Load the compiled module, releasing our ownership of the CompilerOutput.
   ORT_RETURN_IF_ERROR(iree_ep_rt::HandleIREEStatus(rt_session->AppendBytecodeModule(vmfb_path,
                                                                                     vmfb_output.Release(vmfb_path))));
